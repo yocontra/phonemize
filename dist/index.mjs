@@ -1,0 +1,1 @@
+import{useG2P}from"./core.mjs";export{Tokenizer,addPronunciation,createTokenizer,phonemize,toARPABET,toIPA,toZhuyin}from"./core.mjs";import{G2PModel}from"./en-g2p.mjs";import"./tslib.es6-BW0Qs9W2.mjs";import"./anyascii.json";import"./utils-BEZDKZ1C.mjs";import"./en/dict.json";import"./en/homographs.json";useG2P(new G2PModel);export{useG2P};
