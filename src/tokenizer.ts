@@ -15,7 +15,7 @@ import type ChineseG2P from "./zh-g2p";
 // Tokenization regex patterns
 const TOKEN_REGEX = /([\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]+|\w+['']?\w*|[^\w\s\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff])/g;
 
-// All IPA vowel symbols used for rhotacized vowel detection
+// All IPA vowel symbols used for vowel processing
 const IPA_VOWELS = 'ɑɒæəɔɛɜɪʊʌaeioɚuɝ';
 
 /**
@@ -40,6 +40,33 @@ function fixRhotacizedVowels(ipa: string): string {
   // 3. Linking ɹ: insert ɹ between ɚ and a following vowel
   const reLinkingR = new RegExp(`ɚ(?=[${IPA_VOWELS}])`, 'g')
   result = result.replace(reLinkingR, 'ɚɹ')
+
+  return result
+}
+
+// Patterns for stressed i/u (first vowel after stress mark)
+const RE_STRESSED_I = new RegExp(`([ˈˌ][^${IPA_VOWELS}\\sˈˌ]*)(i)(?!ː)`, 'g');
+const RE_STRESSED_U = new RegExp(`([ˈˌ][^${IPA_VOWELS}\\sˈˌ]*)(u)(?!ː)`, 'g');
+
+/**
+ * Add vowel length marks (ː) to IPA output for American English.
+ *
+ * Rules:
+ * - FLEECE (i) and GOOSE (u): lengthened only when they are the first
+ *   vowel in a stressed syllable (after ˈ or ˌ). Word-final unstressed
+ *   short vowels (e.g. "happy" = hæpi) are preserved.
+ * - THOUGHT (ɔ) and PALM/LOT (ɑ): always long in American English.
+ */
+function addVowelLength(ipa: string): string {
+  let result = ipa
+    // i → iː only when stressed (first vowel after stress mark)
+    .replace(RE_STRESSED_I, '$1iː')
+    // u → uː only when stressed (first vowel after stress mark)
+    .replace(RE_STRESSED_U, '$1uː')
+
+  // ɔ and ɑ: always long in American English
+  result = result.replace(/ɔ(?!ː)/g, 'ɔː')
+  result = result.replace(/ɑ(?!ː)/g, 'ɑː')
 
   return result
 }
@@ -278,7 +305,7 @@ export class Tokenizer {
   /**
    * Post-process phonemes for format conversion and cleanup
    */
-  protected _postProcess(phonemes: string): string {
+  protected _postProcess(phonemes: string, language?: string): string {
     if (this.options.format === "arpabet") {
       // Convert to ARPABET format
       phonemes = ipaToArpabet(phonemes);
@@ -294,10 +321,15 @@ export class Tokenizer {
       return phonemes;
     } else {
       // IPA format processing
-      
+
       // Fix rhotacized vowel distinctions (ɝ → ɜː stressed, ɚ unstressed)
       phonemes = fixRhotacizedVowels(phonemes);
-      
+
+      // Add vowel length marks for English words only
+      if (!language || language === 'en') {
+        phonemes = addVowelLength(phonemes);
+      }
+
       // Convert Chinese tone format if requested
       if (this.options.toneFormat === "arrow") {
         phonemes = convertChineseTonesToArrows(phonemes);
@@ -314,7 +346,7 @@ export class Tokenizer {
 
   private _predict(token: string, language: string, pos: string): string {
     const predicted = predictPhonemes(token, language, pos);
-    return this._postProcess(predicted || token);
+    return this._postProcess(predicted || token, language);
   }
 
   /**
