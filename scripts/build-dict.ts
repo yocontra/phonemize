@@ -25,12 +25,17 @@ function parseDict(content: string): DictEntry {
     const variants = [...phonesStr.matchAll(/\/([^\/]+)\//g)].map(m => m[1]);
     if (variants.length === 0) continue;
 
-    // When multiple variants exist, prefer the one containing ɔ (THOUGHT vowel)
-    // over ɑ (LOT vowel). The ipa-dict source lists ɑ variants first for words
-    // like "caught", "bought", "law", "fall", "walk", etc., but ɔ better
-    // represents standard American English pronunciation for these words.
-    const ipa = variants.find(v => v.includes("ɔ")) ?? variants[0];
-    dict[word.toLowerCase()] = ipa;
+    // ipa-dict often lists both ɑ and ɔ variants for cot-caught merger
+    // ambiguous words. For THOUGHT-class words (spelled with augh/ough/aw/au/
+    // alk/alm/all/alt) the ɔ variant matches standard General American better.
+    // For other words (LOT-class like "doctor", "lot", "hot") keep first
+    // variant — choosing ɔ universally would mispronounce them.
+    const lowerWord = word.toLowerCase();
+    const isThoughtSpelling = /augh|ough|aw|au[a-z]|alk|alm|all|alt/.test(lowerWord);
+    const ipa = isThoughtSpelling
+      ? (variants.find(v => v.includes("ɔ")) ?? variants[0])
+      : variants[0];
+    dict[lowerWord] = ipa;
   }
 
   return dict;
